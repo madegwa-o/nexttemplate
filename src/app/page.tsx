@@ -1,210 +1,386 @@
-'use client';
+"use client";
+import { signIn, useSession } from "next-auth/react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ArrowRight, Building2, Users, CreditCard, Shield, CheckCircle, Key } from "lucide-react";
+import Link from "next/link";
+import { useNotifications } from "@/components/notifications/notification-context";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 
-import { useState, useEffect } from 'react';
-import Image from 'next/image';
-
-interface ImageData {
-  filename: string;
-  url: string;
-  lastModified: string;
-  size: number;
-}
 
 export default function Home() {
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadedImages, setUploadedImages] = useState<ImageData[]>([]);
-  const [previewUrl, setPreviewUrl] = useState<string>('');
-  const [loading, setLoading] = useState(true);
+    const { data: session } = useSession();
 
-  // Fetch images from R2 bucket on component mount
-  useEffect(() => {
-    fetchImages();
-  }, []);
+    const { addNotification } = useNotifications();
+    const isOnline = useNetworkStatus();
 
-  const fetchImages = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/images');
-      const data = await response.json();
+    // Enhanced sign-in handler with error handling
+    const handleSignIn = async () => {
+        if (session) {
+            addNotification({
+                type: "info",
+                title: "Already signed in",
+                message: `You're already signed in as ${session.user?.email}`,
+                duration: 4000,
+            });
+            return;
+        }
 
-      if (data.images) {
-        setUploadedImages(data.images);
-      }
-    } catch (error) {
-      console.error('Error fetching images:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        if (!isOnline) {
+            addNotification({
+                type: 'warning',
+                title: 'No Internet Connection',
+                message: 'Please check your internet connection and try again.',
+                duration: 5000,
+            });
+            return;
+        }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      // Create preview URL
-      const url = URL.createObjectURL(selectedFile);
-      setPreviewUrl(url);
-    }
-  };
+        try {
+            // Show loading notification
+            addNotification({
+                type: 'info',
+                title: 'Signing In',
+                message: 'Please wait while we connect to Google...',
+                duration: 3000,
+            });
 
-  const handleUpload = async () => {
-    if (!file) return;
+            await signIn("google");
+        } catch (error) {
+            addNotification({
+                type: 'error',
+                title: 'Sign-in Failed',
+                message: 'An unexpected error occurred. Please try again.',
+                duration: 5000,
+                actions: [
+                    {
+                        label: 'Retry',
+                        onClick: () => handleSignIn()
+                    }
+                ]
+            });
+            console.error(error);
+        }
+    };
 
-    setUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
+    const features = [
+        {
+            icon: Building2,
+            title: "Feature One",
+            description: "Comprehensive tools and features designed to streamline your workflow and boost productivity."
+        },
+        {
+            icon: Users,
+            title: "Feature Two",
+            description: "Collaborate seamlessly with your team and manage relationships in one central location."
+        },
+        {
+            icon: CreditCard,
+            title: "Feature Three",
+            description: "Secure payment processing with automatic tracking and detailed reporting capabilities."
+        },
+        {
+            icon: Shield,
+            title: "Feature Four",
+            description: "Enterprise-grade security with 99.9% uptime guarantee to protect your valuable data."
+        }
+    ];
 
-    try {
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
+    const stats = [
+        { value: "100%", label: "Secure" },
+        { value: "100%", label: "Cloud Backups" },
+        { value: "99.8%", label: "Success Rate" },
+        { value: "24/7", label: "Support Available" }
+    ];
 
-      const data = await response.json();
-
-      if (data.success) {
-        // Refresh the images list after successful upload
-        await fetchImages();
-        setFile(null);
-        setPreviewUrl('');
-        alert('Image uploaded successfully!');
-      } else {
-        alert('Upload failed: ' + data.error);
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      alert('Upload failed');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  return (
-      <div className="font-sans min-h-screen p-8 pb-20 bg-gray-50 dark:bg-gray-900">
-        <main className="max-w-6xl mx-auto">
-          <h1 className="text-4xl font-bold mb-8 text-center text-gray-900 dark:text-white">
-            R2 Image Gallery
-          </h1>
-
-          {/* Upload Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-900 dark:text-white">
-              Upload Image
-            </h2>
-
-            <div className="space-y-4">
-              <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="block w-full text-sm text-gray-900 dark:text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900 dark:file:text-blue-300 cursor-pointer"
-              />
-
-              {previewUrl && (
-                  <div className="relative w-full h-64 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden">
-                    <Image
-                        src={previewUrl}
-                        alt="Preview"
-                        fill
-                        className="object-contain"
-                    />
-                  </div>
-              )}
-
-              <button
-                  onClick={handleUpload}
-                  disabled={!file || uploading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-              >
-                {uploading ? 'Uploading...' : 'Upload Image'}
-              </button>
-            </div>
-          </div>
-
-          {/* Images Gallery Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-                Gallery ({uploadedImages.length} images)
-              </h2>
-              <button
-                  onClick={fetchImages}
-                  disabled={loading}
-                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
-              >
-                {loading ? 'Loading...' : 'Refresh'}
-              </button>
-            </div>
-
-            {loading ? (
-                <div className="text-center py-12">
-                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                  <p className="mt-4 text-gray-600 dark:text-gray-400">Loading images...</p>
-                </div>
-            ) : uploadedImages.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-600 dark:text-gray-400">No images yet. Upload your first image!</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {uploadedImages.map((image, index) => (
-                      <div
-                          key={image.filename}
-                          className="group relative bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden hover:shadow-xl transition-shadow"
-                      >
-                        <div className="relative aspect-square">
-                          <Image
-                              src={image.url}
-                              alt={image.filename}
-                              fill
-                              className="object-cover"
-                          />
+    return (
+        <main className="min-h-screen p-8 max-w-6xl mx-auto" >
+            {/* Hero Section */}
+            {session && (
+                <section className="py-20 rounded-2xl mb-16" style={{
+                    background: 'linear-gradient(135deg, var(--surface-secondary) 0%, var(--surface-hover) 100%)',
+                    border: '1px solid var(--border)'
+                }}>
+                    <div className="max-w-7xl mx-auto px-6">
+                        <div className="text-center mb-12">
+                            <h2 className="text-3xl lg:text-4xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+                                Choose your role
+                            </h2>
+                            <p className="text-xl max-w-2xl mx-auto" style={{ color: 'var(--text-secondary)' }}>
+                                Get started with the tools designed for your specific needs.
+                            </p>
                         </div>
-                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-60 transition-opacity flex flex-col items-center justify-center p-4 opacity-0 group-hover:opacity-100">
-                          <p className="text-white text-xs text-center mb-2 break-all">
-                            {image.filename}
-                          </p>
-                          <p className="text-gray-300 text-xs">
-                            {formatFileSize(image.size)}
-                          </p>
-                          <p className="text-gray-300 text-xs">
-                            {formatDate(image.lastModified)}
-                          </p>
-                          <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(
-                                    `${window.location.origin}${image.url}`
-                                );
-                                alert('URL copied to clipboard!');
-                              }}
-                              className="mt-3 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
-                          >
-                            Copy URL
-                          </button>
+
+                        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                            <Card className="shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group" style={{
+                                background: 'var(--surface)',
+                                border: '1px solid var(--border)'
+                            }}>
+                                <CardHeader className="pb-4">
+                                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300" style={{
+                                        background: 'var(--success)',
+                                        opacity: '0.1'
+                                    }}>
+                                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{
+                                            background: 'var(--success)'
+                                        }}>
+                                            <Key className="h-8 w-8 text-white" />
+                                        </div>
+                                    </div>
+                                    <CardTitle className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                                        Role One
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
+                                    <p className="text-lg" style={{ color: 'var(--text-secondary)' }}>
+                                        Manage your operations, track performance, and handle relationships with ease.
+                                    </p>
+                                    <div className="space-y-3">
+                                        {["Create & manage items", "Track activities", "Communication tools", "Detailed reports"].map((item, i) => (
+                                            <div key={i} className="flex items-center gap-3">
+                                                <CheckCircle className="h-5 w-5" style={{ color: 'var(--success)' }} />
+                                                <span style={{ color: 'var(--text-secondary)' }}>{item}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="pt-4 space-y-3">
+                                        <Link href="/create-item" className="block">
+                                            <Button className="w-full py-6 text-lg font-semibold rounded-xl hover:opacity-90 transition-opacity" style={{
+                                                background: 'var(--foreground)',
+                                                color: 'var(--background)'
+                                            }}>
+                                                Create New
+                                            </Button>
+                                        </Link>
+                                        <Link href="/dashboard" className="block">
+                                            <Button variant="outline" className="w-full py-6 text-lg font-semibold rounded-xl transition-colors" style={{
+                                                border: '1px solid var(--border)',
+                                                background: 'transparent',
+                                                color: 'var(--text-primary)'
+                                            }}>
+                                                View Dashboard
+                                            </Button>
+                                        </Link>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group" style={{
+                                background: 'var(--surface)',
+                                border: '1px solid var(--border)'
+                            }}>
+                                <CardHeader className="pb-4">
+                                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300" style={{
+                                        background: 'var(--text-primary)',
+                                        opacity: '0.1'
+                                    }}>
+                                        <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{
+                                            background: 'var(--text-primary)'
+                                        }}>
+                                            <Users className="h-8 w-8 text-white" />
+                                        </div>
+                                    </div>
+                                    <CardTitle className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                                        Role Two
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
+                                    <p className="text-lg" style={{ color: 'var(--text-secondary)' }}>
+                                        Browse options, make secure transactions, and communicate with your provider.
+                                    </p>
+                                    <div className="space-y-3">
+                                        {["Browse available options", "Secure transactions", "Support requests", "Activity history"].map((item, i) => (
+                                            <div key={i} className="flex items-center gap-3">
+                                                <CheckCircle className="h-5 w-5" style={{ color: 'var(--text-primary)' }} />
+                                                <span style={{ color: 'var(--text-secondary)' }}>{item}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="pt-4 space-y-3">
+                                        <Link href="/browse" className="block">
+                                            <Button className="w-full py-6 text-lg font-semibold rounded-xl hover:opacity-90 transition-opacity" style={{
+                                                background: 'var(--foreground)',
+                                                color: 'var(--background)'
+                                            }}>
+                                                Browse Now
+                                            </Button>
+                                        </Link>
+                                        <Link href="/dashboard" className="block">
+                                            <Button variant="outline" className="w-full py-6 text-lg font-semibold rounded-xl transition-colors" style={{
+                                                border: '1px solid var(--border)',
+                                                background: 'transparent',
+                                                color: 'var(--text-primary)'
+                                            }}>
+                                                View Dashboard
+                                            </Button>
+                                        </Link>
+                                    </div>
+                                </CardContent>
+                            </Card>
                         </div>
-                      </div>
-                  ))}
-                </div>
+                    </div>
+                </section>
             )}
-          </div>
+
+            <section className="relative overflow-hidden">
+                <div className="absolute inset-0" style={{ background: 'var(--surface-hover)', opacity: '0.3' }}></div>
+                <div className="relative max-w-7xl mx-auto px-6 py-20 lg:py-32">
+                    <div className="text-center max-w-4xl mx-auto">
+                        <Badge variant="secondary" className="mb-6 px-4 py-2 text-sm font-medium" style={{
+                            background: 'var(--surface-secondary)',
+                            color: 'var(--text-secondary)',
+                            border: '1px solid var(--border)'
+                        }}>
+                            Trusted by Professionals Worldwide
+                        </Badge>
+                        <h1 className="text-4xl lg:text-6xl font-bold mb-6 leading-tight" style={{ color: 'var(--text-primary)' }}>
+                            Modern Platform for
+                            <br />
+                            <span className="bg-gradient-to-r from-current to-current bg-clip-text" style={{
+                                background: `linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%)`,
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                backgroundClip: 'text'
+                            }}>
+                              Your Business
+                          </span>
+                        </h1>
+                        <p className="text-xl mb-12 max-w-2xl mx-auto leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                            Streamline your operations with our all-in-one platform. From setup to execution, we&#39;ve got you covered.
+                        </p>
+
+                        {session ? (
+                            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                                <Link href="/dashboard">
+                                    <Button size="lg" className="px-8 py-6 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl hover:opacity-90 transition-all duration-300" style={{
+                                        background: 'var(--foreground)',
+                                        color: 'var(--background)'
+                                    }}>
+                                        Go to Dashboard
+                                        <ArrowRight className="ml-2 h-5 w-5" />
+                                    </Button>
+                                </Link>
+                                <div className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
+                                    Welcome back, {session.user?.name}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                                <Button
+                                    size="lg"
+                                    onClick={() => handleSignIn()}
+                                    className="px-8 py-6 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl hover:opacity-90 transition-all duration-300"
+                                    style={{
+                                        background: 'var(--foreground)',
+                                        color: 'var(--background)'
+                                    }}
+                                >
+                                    Get Started Free
+                                    <ArrowRight className="ml-2 h-5 w-5" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="lg"
+                                    className="px-8 py-6 text-lg font-semibold rounded-xl transition-all duration-300 hover:bg-opacity-50"
+                                    style={{
+                                        border: '2px solid var(--border)',
+                                        background: 'transparent',
+                                        color: 'var(--text-primary)'
+                                    }}
+                                >
+                                    Watch Demo
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </section>
+
+            {/* Stats Section */}
+            <section className="py-16 backdrop-blur-sm" style={{
+                background: 'var(--surface-secondary)',
+                borderTop: '1px solid var(--border)',
+                borderBottom: '1px solid var(--border)'
+            }}>
+                <div className="max-w-7xl mx-auto px-6">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+                        {stats.map((stat, index) => (
+                            <div key={index} className="text-center">
+                                <div className="text-3xl lg:text-4xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+                                    {stat.value}
+                                </div>
+                                <div className="font-medium" style={{ color: 'var(--text-secondary)' }}>
+                                    {stat.label}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            {/* Features Section */}
+            <section className="py-20">
+                <div className="max-w-7xl mx-auto px-6">
+                    <div className="text-center mb-16">
+                        <h2 className="text-3xl lg:text-4xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+                            Everything you need in one place
+                        </h2>
+                        <p className="text-xl max-w-2xl mx-auto" style={{ color: 'var(--text-secondary)' }}>
+                            Powerful tools designed to simplify your workflow and enhance user experience.
+                        </p>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {features.map((feature, index) => (
+                            <Card key={index} className="shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm" style={{
+                                background: 'var(--surface)',
+                                border: '1px solid var(--border)'
+                            }}>
+                                <CardContent className="p-8">
+                                    <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-6" style={{
+                                        background: 'var(--surface-hover)'
+                                    }}>
+                                        <feature.icon className="h-6 w-6" style={{ color: 'var(--text-primary)' }} />
+                                    </div>
+                                    <h3 className="text-xl font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>
+                                        {feature.title}
+                                    </h3>
+                                    <p className="leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                                        {feature.description}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            {/* CTA Section */}
+            <section className="py-20 rounded-2xl" style={{ background: 'var(--surface-secondary)' }}>
+                <div className="max-w-4xl mx-auto px-6 text-center">
+                    <h2 className="text-3xl lg:text-4xl font-bold mb-6" style={{ color: 'var(--text-primary)' }}>
+                        Ready to transform your workflow?
+                    </h2>
+                    <p className="text-xl mb-10" style={{ color: 'var(--text-secondary)' }}>
+                        Join thousands of users who trust our platform for their business needs.
+                    </p>
+                    {!session && (
+                        <Button
+                            size="lg"
+                            onClick={() => handleSignIn()}
+                            className="px-12 py-6 text-xl font-semibold rounded-2xl shadow-xl hover:shadow-2xl hover:opacity-90 transition-all duration-300"
+                            style={{
+                                background: 'var(--foreground)',
+                                color: 'var(--background)'
+                            }}
+                        >
+                            Get Started
+                            <ArrowRight className="ml-3 h-6 w-6" />
+                        </Button>
+                    )}
+                </div>
+            </section>
         </main>
-      </div>
-  );
+    );
 }
