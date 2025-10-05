@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 
         if (!title || !body) {
             return NextResponse.json(
-                { error: 'Title and body are required' },
+                { error: 'Title and body are very required' },
                 { status: 400 }
             );
         }
