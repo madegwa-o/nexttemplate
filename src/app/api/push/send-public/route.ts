@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
 
         // If no subscriptions in memory, return early
         if (subscriptions.length === 0) {
+            console.log('No subscriptions were found');
             return NextResponse.json({
                 success: true,
                 sent: 0,
