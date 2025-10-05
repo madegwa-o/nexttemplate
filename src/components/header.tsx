@@ -2,13 +2,32 @@
 
 import Image from "next/image";
 import { signIn, signOut, useSession } from "next-auth/react";
-import { useState, useEffect } from "react";
+import {useState, useEffect, useRef} from "react";
 import Link from "next/link";
 
 export default function Header() {
     const { data: session } = useSession();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isDarkMode, setIsDarkMode] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    // Close menu when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsMenuOpen(false);
+            }
+        }
+
+        // Only add listener when menu is open
+        if (isMenuOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isMenuOpen]);
 
     // Initialize theme from localStorage or system preference
     useEffect(() => {
@@ -50,7 +69,9 @@ export default function Header() {
 
 
     return (
-        <header className="sticky top-0 z-50 w-full border-b backdrop-blur-lg"
+        <header
+                ref={menuRef}
+                className="sticky top-0 z-50 w-full border-b backdrop-blur-lg"
                 style={{
                     borderColor: 'var(--header-border)',
                     backgroundColor: 'var(--header-bg)'
