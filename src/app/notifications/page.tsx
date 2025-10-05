@@ -27,7 +27,7 @@ export default function PushNotifications() {
             const data = await response.json();
 
             if (response.ok) {
-                setResult(`✅ Notification sent successfully! (Sent: ${data.sent}, Failed: ${data.failed})`);
+                setResult(`✅ ${data.message}! (Sent: ${data.sent}, Failed: ${data.failed}).`);
             } else {
                 setResult(`❌ Error: ${data.error}`);
             }
