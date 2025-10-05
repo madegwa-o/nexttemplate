@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import webpush from 'web-push';
-// import Subscription from '@/models/Subscription';
+import { connectToDatabase } from '@/lib/db';
+import { Subscription } from '@/models/Subscription';
+import { getServerSession } from 'next-auth';
 
 // Configure web-push
 webpush.setVapidDetails(
@@ -9,24 +11,28 @@ webpush.setVapidDetails(
     process.env.VAPID_PRIVATE_KEY!
 );
 
-
-type PushSubscriptionData = {
-    endpoint: string;
-    keys: {
-        p256dh: string;
-        auth: string;
-    };
-};
-
 export async function POST(request: NextRequest) {
     try {
+        const session = await getServerSession();
+        if (!session?.user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { title, body, url, userId } = await request.json();
 
-        // Get user's subscriptions from database
-        // const subscriptions = await Subscription.find({ userId });
+        await connectToDatabase();
 
-        // For demo purposes, using a mock subscription
-        const subscriptions: PushSubscriptionData[] = []; // Replace with actual DB query
+        // Get user's subscriptions from database
+        const subscriptions = await Subscription.find({ userId }).lean();
+
+        if (subscriptions.length === 0) {
+            return NextResponse.json({
+                success: true,
+                sent: 0,
+                failed: 0,
+                message: 'No subscriptions found for this user',
+            });
+        }
 
         const payload = JSON.stringify({
             title,
@@ -39,17 +45,23 @@ export async function POST(request: NextRequest) {
                 webpush.sendNotification(
                     {
                         endpoint: sub.endpoint,
-                        keys: sub.keys,
+                        keys: {
+                            p256dh: sub.keys.p256dh,
+                            auth: sub.keys.auth,
+                        },
                     },
                     payload
                 )
             )
         );
 
+        const sent = results.filter((r) => r.status === 'fulfilled').length;
+        const failed = results.filter((r) => r.status === 'rejected').length;
+
         return NextResponse.json({
             success: true,
-            sent: results.filter((r) => r.status === 'fulfilled').length,
-            failed: results.filter((r) => r.status === 'rejected').length,
+            sent,
+            failed,
         });
     } catch (error) {
         console.error('Error sending push notification:', error);

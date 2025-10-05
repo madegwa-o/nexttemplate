@@ -1,20 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { connectToDatabase } from '@/lib/db';
+import { Subscription } from '@/models/Subscription';
 
 export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession();
-        if (!session?.user) {
+        if (!session?.user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const subscription = await request.json();
+        await connectToDatabase();
 
-        // Remove subscription from your database
-        // await Subscription.deleteOne({
-        //   userId: session.user.id,
-        //   endpoint: subscription.endpoint,
-        // });
+        const subscriptionData = await request.json();
+
+        // Remove subscription from database
+        await Subscription.deleteOne({
+            endpoint: subscriptionData.endpoint,
+        });
 
         return NextResponse.json({ success: true });
     } catch (error) {

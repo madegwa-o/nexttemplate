@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import webpush from 'web-push';
+import { connectToDatabase } from '@/lib/db';
+import { Subscription } from '@/models/Subscription';
 
 // Configure web-push with VAPID details
 webpush.setVapidDetails(
@@ -16,13 +18,9 @@ type PushSubscriptionJSON = {
     };
 };
 
-// In-memory storage for subscriptions (for testing only)
-// In production, use a database
-const subscriptions: PushSubscriptionJSON[] = [];
-
 export async function POST(request: NextRequest) {
     try {
-        const { title, body, url } = await request.json();
+        const { title, body, url, userId } = await request.json();
 
         if (!title || !body) {
             return NextResponse.json(
@@ -31,12 +29,14 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // For testing: Get all subscriptions from your database
-        // const subscriptions = await Subscription.find({});
+        await connectToDatabase();
 
-        // If no subscriptions in memory, return early
+        // Get all subscriptions from database (or filter by userId if provided)
+        const query = userId ? { userId } : {};
+        const subscriptions = await Subscription.find(query).lean();
+
         if (subscriptions.length === 0) {
-            console.log('No subscriptions were found');
+            console.log('No subscriptions found in database');
             return NextResponse.json({
                 success: true,
                 sent: 0,
@@ -66,6 +66,17 @@ export async function POST(request: NextRequest) {
             )
         );
 
+        // Remove failed subscriptions (expired or invalid)
+        const failedResults = results
+            .map((result, index) => ({ result, index }))
+            .filter(({ result }) => result.status === 'rejected');
+
+        for (const { index } of failedResults) {
+            const failedSub = subscriptions[index];
+            await Subscription.deleteOne({ endpoint: failedSub.endpoint });
+            console.log('Removed invalid subscription:', failedSub.endpoint);
+        }
+
         const sent = results.filter((r) => r.status === 'fulfilled').length;
         const failed = results.filter((r) => r.status === 'rejected').length;
 
@@ -74,39 +85,12 @@ export async function POST(request: NextRequest) {
             sent,
             failed,
             total: subscriptions.length,
+            message: 'Notification sent successfully',
         });
     } catch (error) {
         console.error('Error sending push notification:', error);
         return NextResponse.json(
             { error: 'Failed to send notification' },
-            { status: 500 }
-        );
-    }
-}
-
-// Helper endpoint to add a subscription (for testing)
-export async function PUT(request: NextRequest) {
-    try {
-        const subscription = await request.json();
-
-        // Check if subscription already exists
-        const exists = subscriptions.some(
-            (sub) => sub.endpoint === subscription.endpoint
-        );
-
-        if (!exists) {
-            subscriptions.push(subscription);
-        }
-
-        return NextResponse.json({
-            success: true,
-            message: 'Subscription added',
-            total: subscriptions.length,
-        });
-    } catch (error) {
-        console.error('Error adding subscription:', error);
-        return NextResponse.json(
-            { error: 'Failed to add subscription' },
             { status: 500 }
         );
     }
