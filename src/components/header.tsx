@@ -62,9 +62,9 @@ export default function Header() {
 
     const navigationItems = [
         { label: "Home", href: "/" },
-        { label: "About", href: "/about" },
-        { label: "Dashboard", href: "/dashboard" },
-        { label: "Settings", href: "/dashboard/settings" }
+        { label: "Notifications", href: "/notifications" },
+        { label: "Images", href: "/images" },
+        { label: "Settings", href: "/images/settings" }
     ];
 
 

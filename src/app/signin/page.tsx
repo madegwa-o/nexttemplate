@@ -15,7 +15,7 @@ export default function SignInPage() {
         setMounted(true);
     }, []);
 
-    // Redirect authenticated users to /dashboard
+    // Redirect authenticated users to /images
     useEffect(() => {
         if (status === "authenticated" && session) {
             router.push("/dashboard");
@@ -25,7 +25,7 @@ export default function SignInPage() {
     const handleSignIn = async (provider: string) => {
         setIsLoading(true);
         try {
-            await signIn(provider, { callbackUrl: "/dashboard" });
+            await signIn(provider, { callbackUrl: "/images" });
         } catch (error) {
             console.error("Sign in error:", error);
         } finally {

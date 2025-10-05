@@ -7,7 +7,8 @@ import {AuthProvider} from "@/components/auth-provider";
 import { Analytics } from "@vercel/analytics/next"
 import { NotificationDisplay } from "@/components/notifications/notification-display";
 import AuthErrorHandlerWrapper from "@/components/auth-error-handler-wrapper";
-
+import { NotificationProvider } from "@/components/notifications/notification-context";
+import PushNotificationInitializer from "@/components/push-notification-initializer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -47,10 +48,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
       <AuthProvider>
-          <Header />
-          {children}
-          <NotificationDisplay />
-          <AuthErrorHandlerWrapper />
+          <NotificationProvider>
+              <Header />
+              {children}
+              <NotificationDisplay />
+              <AuthErrorHandlerWrapper />
+              <PushNotificationInitializer />
+          </NotificationProvider>
       </AuthProvider>
       <InstallPrompt />
       <Analytics />
